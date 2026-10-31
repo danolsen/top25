@@ -1,0 +1,6 @@
+name = "top25"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-10-30"
+
+[vars]
+API_ORIGIN = "https://top25.fly.dev"
