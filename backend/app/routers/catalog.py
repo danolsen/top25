@@ -12,7 +12,7 @@ from app.db import get_db
 from app.deps import get_optional_user, get_super_admin
 from app.models import Ballot, BallotPick, League, OfficialEntry, OfficialPoll, School, Season, Team, User, Week
 from app.schemas import SchoolImportOut, SchoolIn, SchoolOut, SchoolUpdate, TeamOut
-from app.services.catalog import SCHOOL_IMPORT_TEMPLATE, SchoolImportError, load_schools_csv, school_out, team_out
+from app.services.catalog import SCHOOL_IMPORT_TEMPLATE, SchoolImportError, load_schools_csv, school_out, team_out, team_usage
 
 router = APIRouter(prefix="/api", tags=["teams"])
 
@@ -23,6 +23,11 @@ IMAGE_TYPES = {
     "image/gif": "gif",
 }
 MEDIA_NAME = re.compile(r"^[a-f0-9]{32}\.(png|jpg|jpeg|webp|gif)$")
+
+
+def _present_schools(db: Session, schools: list[School]) -> list[SchoolOut]:
+    usage = team_usage(db, [team.id for school in schools for team in school.teams])
+    return [school_out(school, usage) for school in schools]
 
 
 def _sport_name(sport: str) -> str:
@@ -104,7 +109,7 @@ def list_teams(
 @router.get("/schools", response_model=list[SchoolOut])
 def list_schools(_: User = Depends(get_super_admin), db: Session = Depends(get_db)):
     rows = db.scalars(select(School).options(joinedload(School.teams)).order_by(School.name)).unique().all()
-    return [school_out(school) for school in rows]
+    return _present_schools(db, list(rows))
 
 
 @router.get("/schools/import-template")
@@ -156,7 +161,7 @@ def create_school(body: SchoolIn, _: User = Depends(get_super_admin), db: Sessio
         db.rollback()
         raise HTTPException(status_code=409, detail="A school with that name already exists.") from exc
     db.refresh(school)
-    return school_out(school)
+    return _present_schools(db, [school])[0]
 
 
 @router.patch("/schools/{school_id}", response_model=SchoolOut)
@@ -191,7 +196,7 @@ def update_school(
         db.rollback()
         raise HTTPException(status_code=409, detail="A school with that name already exists.") from exc
     db.refresh(school)
-    return school_out(school)
+    return _present_schools(db, [school])[0]
 
 
 @router.delete("/schools/{school_id}", status_code=204)
@@ -238,7 +243,7 @@ async def upload_logo(
     school.logo_file_key = key
     db.commit()
     db.refresh(school)
-    return school_out(school)
+    return _present_schools(db, [school])[0]
 
 
 @router.get("/media/{key}")

@@ -424,7 +424,7 @@ export function AdminTeams() {
   return (
     <section className="stack">
       <h1>Teams</h1>
-      <p>One school can play football, basketball, or both. The lists stay separate.</p>
+      <p>One school can play football, basketball, or both. The lists stay separate. A mark shows when that sport is on a published Top 25 or on a ballot.</p>
       {error && <p className="danger" style={{ whiteSpace: "pre-line" }}>{error}</p>}
       {notice && <p className="good">{notice}</p>}
       <div className="panel stack">
@@ -467,6 +467,16 @@ export function AdminTeams() {
   );
 }
 
+function UsageMarks({ team }: { team: School["teams"][number] | undefined }) {
+  if (!team || (!team.on_published_poll && !team.on_ballot)) return null;
+  return (
+    <span className="usage-marks">
+      {team.on_published_poll && <span>Published Top 25</span>}
+      {team.on_ballot && <span>On a ballot</span>}
+    </span>
+  );
+}
+
 function sportsFor(school: School) {
   return {
     football: school.teams.some((team) => team.sport === "mens_football" && team.active),
@@ -502,8 +512,14 @@ function SchoolEditor({
         <label className="field">Primary<input type="color" value={draft.primary_color} onChange={(event) => setDraft({ ...draft, primary_color: event.target.value })} /></label>
         <label className="field">Secondary<input type="color" value={draft.secondary_color} onChange={(event) => setDraft({ ...draft, secondary_color: event.target.value })} /></label>
       </div>
-      <label><input type="checkbox" checked={sports.football} onChange={(event) => setSports({ ...sports, football: event.target.checked })} /> Football</label>
-      <label><input type="checkbox" checked={sports.basketball} onChange={(event) => setSports({ ...sports, basketball: event.target.checked })} /> Basketball</label>
+      <div className="row">
+        <label><input type="checkbox" checked={sports.football} onChange={(event) => setSports({ ...sports, football: event.target.checked })} /> Football</label>
+        <UsageMarks team={school.teams.find((team) => team.sport === "mens_football")} />
+      </div>
+      <div className="row">
+        <label><input type="checkbox" checked={sports.basketball} onChange={(event) => setSports({ ...sports, basketball: event.target.checked })} /> Basketball</label>
+        <UsageMarks team={school.teams.find((team) => team.sport === "mens_basketball")} />
+      </div>
       <div className="row">
         <button className="btn" type="submit">Save</button>
         <button className="btn danger" type="button" onClick={() => setConfirming(true)}>Delete</button>

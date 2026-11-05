@@ -107,6 +107,11 @@ class TeamOut(BaseModel):
     logo_file_url: str | None
 
 
+class SchoolTeamOut(TeamOut):
+    on_published_poll: bool = False
+    on_ballot: bool = False
+
+
 class SchoolIn(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     abbreviation: str = Field(min_length=2, max_length=8)
@@ -188,7 +193,7 @@ class SchoolOut(BaseModel):
     secondary_color: str
     logo_url: str | None
     logo_file_url: str | None
-    teams: list[TeamOut]
+    teams: list[SchoolTeamOut]
 
 
 class SchoolImportOut(BaseModel):

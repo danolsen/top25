@@ -5,8 +5,8 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
-from app.models import School, Team
-from app.schemas import SchoolImportOut, SchoolIn, SchoolOut, TeamOut
+from app.models import BallotPick, OfficialEntry, OfficialPoll, School, Team
+from app.schemas import SchoolImportOut, SchoolIn, SchoolOut, SchoolTeamOut, TeamOut
 
 COLUMNS = ("name", "abbreviation", "mascot", "primary_color", "secondary_color", "logo_url", "football", "basketball")
 YES = {"yes", "y", "true", "1"}
@@ -47,7 +47,26 @@ def team_out(team: Team) -> TeamOut:
     )
 
 
-def school_out(school: School) -> SchoolOut:
+def team_usage(db: Session, team_ids: list[int]) -> dict[int, tuple[bool, bool]]:
+    if not team_ids:
+        return {}
+    published = set(
+        db.scalars(
+            select(OfficialEntry.team_id)
+            .join(OfficialPoll, OfficialPoll.id == OfficialEntry.poll_id)
+            .where(OfficialEntry.team_id.in_(team_ids), OfficialPoll.published_at.is_not(None))
+        ).all()
+    )
+    picked = set(db.scalars(select(BallotPick.team_id).where(BallotPick.team_id.in_(team_ids))).all())
+    return {team_id: (team_id in published, team_id in picked) for team_id in team_ids}
+
+
+def school_out(school: School, usage: dict[int, tuple[bool, bool]] | None = None) -> SchoolOut:
+    flags = usage or {}
+    teams = []
+    for team in school.teams:
+        on_published_poll, on_ballot = flags.get(team.id, (False, False))
+        teams.append(SchoolTeamOut(**team_out(team).model_dump(), on_published_poll=on_published_poll, on_ballot=on_ballot))
     return SchoolOut(
         id=school.id,
         name=school.name,
@@ -57,7 +76,7 @@ def school_out(school: School) -> SchoolOut:
         secondary_color=school.secondary_color,
         logo_url=school.logo_url,
         logo_file_url=logo_file_url(school.logo_file_key),
-        teams=[team_out(team) for team in school.teams],
+        teams=teams,
     )
 
 

@@ -202,6 +202,72 @@ def test_delete_school_and_refuse_one_in_use(client):
     assert "Kept, Football Guard" in detail
 
 
+def test_school_list_marks_a_published_poll_and_a_ballot(client):
+    super_admin(client)
+    body = school_body("Marked State")
+    body["abbreviation"] = "MRK"
+    body["sports"] = ["mens_football", "mens_basketball"]
+    created = call(client, "post", "/api/schools", json=body)
+    assert created.status_code == 200, created.text
+    teams = {team["sport"]: team for team in created.json()["teams"]}
+    assert teams["mens_football"]["on_published_poll"] is False
+    assert teams["mens_basketball"]["on_ballot"] is False
+
+    db = SessionLocal()
+    player = db.scalar(select(User).where(User.email == "boss@example.com"))
+    assert player is not None
+    season = Season(sport="mens_football", name="Marks", status="active")
+    db.add(season)
+    db.flush()
+    week = Week(season_id=season.id, number=1, deadline_at=datetime.now(UTC) + timedelta(days=1), status="published")
+    db.add(week)
+    db.flush()
+    poll = OfficialPoll(week_id=week.id)
+    db.add(poll)
+    db.flush()
+    poll_id = poll.id
+    db.add(
+        OfficialEntry(
+            poll_id=poll.id,
+            team_id=teams["mens_football"]["id"],
+            placement="ranked",
+            position=1,
+            rank=1,
+            votes=0,
+            first_place_votes=0,
+        )
+    )
+    ballot = Ballot(user_id=player.id, week_id=week.id, status="draft")
+    db.add(ballot)
+    db.flush()
+    db.add(BallotPick(ballot_id=ballot.id, team_id=teams["mens_basketball"]["id"], rank=1))
+    db.commit()
+    db.close()
+
+    def marks() -> dict[str, dict]:
+        listed = call(client, "get", "/api/schools").json()
+        school = next(row for row in listed if row["name"] == "Marked State")
+        return {team["sport"]: team for team in school["teams"]}
+
+    before = marks()
+    assert before["mens_football"]["on_published_poll"] is False
+    assert before["mens_football"]["on_ballot"] is False
+    assert before["mens_basketball"]["on_published_poll"] is False
+    assert before["mens_basketball"]["on_ballot"] is True
+
+    db = SessionLocal()
+    saved = db.get(OfficialPoll, poll_id)
+    assert saved is not None
+    saved.published_at = datetime.now(UTC)
+    db.commit()
+    db.close()
+
+    after = marks()
+    assert after["mens_football"]["on_published_poll"] is True
+    assert after["mens_football"]["on_ballot"] is False
+    assert after["mens_basketball"]["on_ballot"] is True
+
+
 def test_import_is_super_admin_only(client):
     register(client, "fan@example.com", "Amber Maple 383")
     response = upload(client, csv_bytes("Coastal,COAST,Seahawks,#003087,#FFFFFF,,yes,no"))

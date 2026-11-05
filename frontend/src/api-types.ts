@@ -288,7 +288,8 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /** Delete School */
+        delete: operations["delete_school_api_schools__school_id__delete"];
         options?: never;
         head?: never;
         /** Update School */
@@ -1191,7 +1192,42 @@ export interface components {
             /** Logo File Url */
             logo_file_url: string | null;
             /** Teams */
-            teams: components["schemas"]["TeamOut"][];
+            teams: components["schemas"]["SchoolTeamOut"][];
+        };
+        /** SchoolTeamOut */
+        SchoolTeamOut: {
+            /** Id */
+            id: number;
+            /** Sport */
+            sport: string;
+            /** Active */
+            active: boolean;
+            /** School Id */
+            school_id: number;
+            /** Name */
+            name: string;
+            /** Abbreviation */
+            abbreviation: string;
+            /** Mascot */
+            mascot: string;
+            /** Primary Color */
+            primary_color: string;
+            /** Secondary Color */
+            secondary_color: string;
+            /** Logo Url */
+            logo_url: string | null;
+            /** Logo File Url */
+            logo_file_url: string | null;
+            /**
+             * On Published Poll
+             * @default false
+             */
+            on_published_poll: boolean;
+            /**
+             * On Ballot
+             * @default false
+             */
+            on_ballot: boolean;
         };
         /** SchoolUpdate */
         SchoolUpdate: {
@@ -1874,6 +1910,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SchoolImportOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_school_api_schools__school_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                school_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

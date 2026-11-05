@@ -160,7 +160,7 @@ export type School = {
   secondary_color: string;
   logo_url: string | null;
   logo_file_url: string | null;
-  teams: Team[];
+  teams: (Team & { on_published_poll: boolean; on_ballot: boolean })[];
 };
 
 export type SchemaCheck = [
