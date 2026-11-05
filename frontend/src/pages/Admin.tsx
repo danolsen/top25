@@ -4,14 +4,24 @@ import { api } from "../api";
 import { useAuth } from "../auth";
 import { SortableRanks } from "../components/SortableRanks";
 import { SeasonSelect, TeamMark, useSeasons } from "../components/ui";
-import { sportLabel, when } from "../format";
+import { officialRanks, shownRank, sportLabel, when } from "../format";
 import { usePinnedSport, useSport, useSportLeaveGuard } from "../sport";
 import type { AdminUser, Audit, Poll, School, SchoolImport, Season, Team, Week } from "../types";
 
-type Slot = { team: Team };
+type Slot = { team: Team; tied?: boolean };
 
 function slotKey(slots: Slot[]) {
-  return slots.map((slot) => slot.team.id).join(",");
+  return slots.map((slot) => `${slot.team.id}:${slot.tied ? "t" : ""}`).join(",");
+}
+
+function keepTies(previous: Slot[], teams: Team[]): Slot[] {
+  return teams.map((team, index) => {
+    const oldIndex = previous.findIndex((slot) => slot.team.id === team.id);
+    const aboveId = index > 0 ? teams[index - 1].id : null;
+    const oldAboveId = oldIndex > 0 ? previous[oldIndex - 1]?.team.id : null;
+    const tied = oldIndex > 0 && Boolean(previous[oldIndex]?.tied) && aboveId === oldAboveId;
+    return { team, tied };
+  });
 }
 
 function localDateTime(value: string) {
@@ -130,10 +140,13 @@ export function AdminPublish() {
       setPoll(view);
       setPrefillNotice(view.source === "previous");
       setDeadlineDraft(localDateTime(view.week.deadline_at));
-      const rankedRows = view.entries.filter((entry) => entry.placement === "ranked").sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
+      const rankedRows = view.entries.filter((entry) => entry.placement === "ranked");
       const alsoRows = view.entries.filter((entry) => entry.placement === "also_receiving");
       remember(
-        rankedRows.map((entry) => ({ team: entry.team })),
+        rankedRows.map((entry, index) => ({
+          team: entry.team,
+          tied: index > 0 && entry.rank != null && entry.rank === rankedRows[index - 1].rank,
+        })),
         alsoRows.map((entry) => ({ team: entry.team })),
       );
       return api<Team[]>(`/api/teams?sport=${view.week.sport}&include_inactive=true`);
@@ -152,7 +165,7 @@ export function AdminPublish() {
   function payload() {
     return {
       entries: [
-        ...ranked.map((slot, index) => ({ team_id: slot.team.id, placement: "ranked", rank: index + 1, votes: 0, first_place_votes: 0 })),
+        ...officialRanks(ranked.map((slot) => Boolean(slot.tied))).map((rank, index) => ({ team_id: ranked[index].team.id, placement: "ranked", rank, votes: 0, first_place_votes: 0 })),
         ...also.map((slot) => ({ team_id: slot.team.id, placement: "also_receiving", rank: null, votes: 0, first_place_votes: 0 })),
       ],
     };
@@ -217,14 +230,38 @@ export function AdminPublish() {
       {error && <p className="danger">{error}</p>}
       {message && <p className="good">{message}</p>}
       <h2 className="section-title">Top 25</h2>
+      <p className="muted">Tie gives a team the same rank as the one above it. A shared rank shows a T.</p>
       <div className={locked ? "stack" : "poll-layout"}>
         <div className="stack">
           <SortableRanks
             teams={ranked.map((slot) => slot.team)}
             disabled={locked}
+            rankLabel={(_team, index) => {
+              const ranks = officialRanks(ranked.map((slot) => Boolean(slot.tied)));
+              return shownRank(ranks[index], ranks.filter((rank) => rank === ranks[index]).length > 1);
+            }}
             onChange={(teams) => {
               setPrefillNotice(false);
-              setRanked(teams.map((team) => ranked.find((slot) => slot.team.id === team.id) ?? { team }));
+              setRanked(keepTies(ranked, teams));
+            }}
+            extra={locked ? undefined : (team) => {
+              const index = ranked.findIndex((slot) => slot.team.id === team.id);
+              if (index <= 0) return null;
+              const tied = Boolean(ranked[index]?.tied);
+              return (
+                <button
+                  className="btn"
+                  type="button"
+                  aria-pressed={tied}
+                  aria-label={tied ? `Untie ${team.name}` : `Tie ${team.name} with the team above`}
+                  onClick={() => {
+                    setPrefillNotice(false);
+                    setRanked(ranked.map((slot, slotIndex) => (slotIndex === index ? { ...slot, tied: !slot.tied } : slot)));
+                  }}
+                >
+                  {tied ? "Untie" : "Tie"}
+                </button>
+              );
             }}
           />
           {!ranked.length && <p className="muted">Add teams from the list.</p>}

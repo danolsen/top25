@@ -225,6 +225,7 @@ export function Rules() {
       <div className="panel">
         <h2>Top 25</h2>
         <p>For each official team, distance is how far your rank is from the official rank.</p>
+        <p>Tied teams share one official rank. Both show that rank with a T, and the next team takes the next open number. Your ballot still uses each number once, so only one of those teams can be an exact match.</p>
         <table className="table">
           <thead><tr><th>Distance</th><th>Points</th></tr></thead>
           <tbody>

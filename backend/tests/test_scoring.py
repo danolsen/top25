@@ -1,3 +1,7 @@
+import pytest
+from fastapi import HTTPException
+
+from app.services.game import check_official_ranks
 from app.services.scoring import bubble_points, proximity_points, score_ballot
 
 
@@ -53,6 +57,26 @@ def test_team_with_no_votes_scores_zero():
     assert result.breakdown["ignored"][0]["team_id"] == 9
     assert result.breakdown["ignored"][0]["points"] == 0
     assert result.total_points == 10
+
+
+def test_tied_official_rank_is_shared():
+    ranked = {team_id: team_id for team_id in range(1, 26)}
+    ranked[6] = 5
+    ranked[7] = 7
+    picks = {team_id: team_id for team_id in range(1, 26)}
+    result = score_ballot(picks, ranked, set())
+    rows = {row["team_id"]: row for row in result.breakdown["proximity"]}
+    assert rows[5]["official_rank"] == 5
+    assert rows[5]["distance"] == 0
+    assert rows[6]["official_rank"] == 5
+    assert rows[6]["distance"] == 1
+    assert rows[7]["distance"] == 0
+
+
+def test_official_ranks_allow_a_tie_and_reject_a_gap():
+    check_official_ranks([1, 2, 2, 4, *range(5, 26)])
+    with pytest.raises(HTTPException):
+        check_official_ranks([1, 2, 2, 3, *range(5, 26)])
 
 
 def test_fringe_slots_cap_at_nine():

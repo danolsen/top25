@@ -27,11 +27,13 @@ export function SortableRanks({
   onChange,
   disabled,
   extra,
+  rankLabel,
 }: {
   teams: Team[];
   onChange: (teams: Team[]) => void;
   disabled?: boolean;
   extra?: (team: Team) => React.ReactNode;
+  rankLabel?: (team: Team, index: number) => string;
 }) {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [overId, setOverId] = useState<number | null>(null);
@@ -72,7 +74,7 @@ export function SortableRanks({
             <SortableRow
               key={team.id}
               team={team}
-              rank={index + 1}
+              rank={rankLabel ? rankLabel(team, index) : String(index + 1)}
               disabled={disabled}
               over={overId === team.id && activeId !== team.id}
               onUp={() => move(index, index - 1)}
@@ -106,7 +108,7 @@ function SortableRow({
   extra,
 }: {
   team: Team;
-  rank: number;
+  rank: string;
   disabled?: boolean;
   over: boolean;
   onUp: () => void;
@@ -126,7 +128,7 @@ function SortableRow({
       <button className="handle" type="button" aria-label={`Drag ${team.name}`} {...attributes} {...listeners} disabled={disabled}>
         ::
       </button>
-      <strong>{rank}</strong>
+      <strong className="rank-num">{rank}</strong>
       <span className="rank-identity" title={`${team.name} ${team.mascot}`}>
         <TeamMark team={team} />
         <span className="team-line">

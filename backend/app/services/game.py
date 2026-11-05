@@ -87,14 +87,27 @@ def _teams_for_sport(db: Session, sport: str, team_ids: set[int]) -> dict[int, T
     return {team.id: team for team in rows}
 
 
+def check_official_ranks(ranks: list[int | None]) -> None:
+    if any(rank is None for rank in ranks):
+        raise HTTPException(status_code=400, detail="Every ranked team needs a rank.")
+    for index, rank in enumerate(ranks, start=1):
+        previous = ranks[index - 2] if index > 1 else None
+        shares_previous = index > 1 and rank == previous
+        owns_place = rank == index
+        if shares_previous or owns_place:
+            continue
+        raise HTTPException(
+            status_code=400,
+            detail="Tie a team with the one above it, or leave it at its own rank.",
+        )
+
+
 def validate_entries(db: Session, sport: str, entries: list[EntryIn]) -> None:
     ranked = [entry for entry in entries if entry.placement == "ranked"]
     also = [entry for entry in entries if entry.placement == "also_receiving"]
     if len(ranked) != 25:
         raise HTTPException(status_code=400, detail="The official poll needs exactly 25 ranked teams.")
-    ranks = [entry.rank for entry in ranked]
-    if sorted(ranks) != list(range(1, 26)):
-        raise HTTPException(status_code=400, detail="Ranks must be 1 through 25 with no gaps.")
+    check_official_ranks([entry.rank for entry in ranked])
     if any(entry.rank is not None for entry in also):
         raise HTTPException(status_code=400, detail="Teams receiving points outside the poll do not get a rank.")
     ids = [entry.team_id for entry in entries]
@@ -108,13 +121,18 @@ def validate_entries(db: Session, sport: str, entries: list[EntryIn]) -> None:
 def replace_poll_entries(db: Session, poll: OfficialPoll, entries: list[EntryIn]) -> None:
     poll.entries.clear()
     db.flush()
+    position = 0
     for entry in entries:
+        ranked = entry.placement == "ranked"
+        if ranked:
+            position += 1
         poll.entries.append(
             OfficialEntry(
                 poll_id=poll.id,
                 team_id=entry.team_id,
                 placement=entry.placement,
-                rank=entry.rank if entry.placement == "ranked" else None,
+                position=position if ranked else None,
+                rank=entry.rank if ranked else None,
                 votes=entry.votes,
                 first_place_votes=entry.first_place_votes,
             )
@@ -210,7 +228,10 @@ def rescore(db: Session, week: Week, actor: User) -> int:
 
 
 def ordered_entries(entries: list[OfficialEntry], names: dict[int, str]) -> list[OfficialEntry]:
-    ranked = sorted((entry for entry in entries if entry.placement == "ranked"), key=lambda entry: entry.rank or 0)
+    ranked = sorted(
+        (entry for entry in entries if entry.placement == "ranked"),
+        key=lambda entry: (entry.position if entry.position is not None else entry.rank or 0, entry.id or 0),
+    )
     also = sorted(
         (entry for entry in entries if entry.placement == "also_receiving"),
         key=lambda entry: (-entry.votes, -entry.first_place_votes, names.get(entry.team_id, "")),
@@ -291,6 +312,7 @@ def prefill(db: Session, week: Week) -> PollOut:
             OfficialEntry(
                 team_id=entry.team_id,
                 placement=entry.placement,
+                position=entry.position,
                 rank=entry.rank,
                 votes=entry.votes,
                 first_place_votes=entry.first_place_votes,

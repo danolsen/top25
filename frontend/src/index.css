@@ -229,6 +229,8 @@ button { min-height: 40px; }
 }
 .rank-row.also-row .team-line { flex: 1; }
 
+.rank-num { min-width: 2.25rem; font-variant-numeric: tabular-nums; }
+.btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 .rank-row .handle {
   width: 40px;
   min-height: 40px;

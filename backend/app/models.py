@@ -154,13 +154,14 @@ class OfficialEntry(Base):
     __tablename__ = "official_entries"
     __table_args__ = (
         UniqueConstraint("poll_id", "team_id", name="uq_official_team"),
-        UniqueConstraint("poll_id", "rank", name="uq_official_rank"),
+        UniqueConstraint("poll_id", "position", name="uq_official_position"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     poll_id: Mapped[int] = mapped_column(ForeignKey("official_polls.id", ondelete="CASCADE"), index=True)
     team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"), index=True)
     placement: Mapped[str] = mapped_column(String(32))
+    position: Mapped[int | None] = mapped_column(Integer, default=None)
     rank: Mapped[int | None] = mapped_column(Integer, default=None)
     votes: Mapped[int] = mapped_column(Integer, default=0)
     first_place_votes: Mapped[int] = mapped_column(Integer, default=0)

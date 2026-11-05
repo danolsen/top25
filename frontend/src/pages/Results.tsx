@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api";
 import { TeamMark } from "../components/ui";
-import { sportLabel } from "../format";
+import { shownRank, sportLabel } from "../format";
 import { usePinnedSport } from "../sport";
 import type { PollEntry, Results as ResultsView } from "../types";
 
@@ -53,7 +53,7 @@ function EntryTable({ title, entries, showRank }: { title: string; entries: Poll
         <tbody>
           {entries.map((entry) => (
             <tr key={entry.team.id}>
-              {showRank && <td>{entry.rank}</td>}
+              {showRank && <td>{entry.rank == null ? "—" : shownRank(entry.rank, entries.filter((other) => other.rank === entry.rank).length > 1)}</td>}
               <td>
                 <span className="row"><TeamMark team={entry.team} />{entry.team.name}</span>
               </td>

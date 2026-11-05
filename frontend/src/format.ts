@@ -20,6 +20,18 @@ export function ordinal(value: number): string {
   }
 }
 
+export function officialRanks(tiedWithAbove: boolean[]): number[] {
+  const ranks: number[] = [];
+  tiedWithAbove.forEach((tied, index) => {
+    ranks.push(index > 0 && tied ? ranks[index - 1] : index + 1);
+  });
+  return ranks;
+}
+
+export function shownRank(rank: number, tied: boolean): string {
+  return tied ? `T${rank}` : String(rank);
+}
+
 export function when(value: string): string {
   return new Date(value).toLocaleString(undefined, {
     weekday: "short",
@@ -27,5 +39,6 @@ export function when(value: string): string {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZoneName: "short",
   });
 }
