@@ -1,8 +1,7 @@
 import pytest
-from fastapi import HTTPException
-
 from app.services.game import check_official_ranks
 from app.services.scoring import bubble_points, proximity_points, score_ballot
+from fastapi import HTTPException
 
 
 def test_proximity_table():
