@@ -307,6 +307,25 @@ class ResultsOut(BaseModel):
     score: ScoreOut | None
 
 
+class RankingWeekOut(BaseModel):
+    id: int
+    number: int
+
+
+class RankingOut(BaseModel):
+    team: TeamOut
+    rank: int | None = None
+    previous_rank: int | None = None
+
+
+class RankingsOut(BaseModel):
+    week: WeekOut
+    previous_week_number: int | None
+    weeks: list[RankingWeekOut]
+    entries: list[RankingOut]
+    dropped: list[RankingOut]
+
+
 class StandingOut(BaseModel):
     rank: int
     user_id: int

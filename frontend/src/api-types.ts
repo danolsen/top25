@@ -365,6 +365,23 @@ export interface paths {
         patch: operations["update_season_api_seasons__season_id__patch"];
         trace?: never;
     };
+    "/api/seasons/{season_id}/rankings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Season Rankings */
+        get: operations["season_rankings_api_seasons__season_id__rankings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/seasons/{season_id}/weeks": {
         parameters: {
             query?: never;
@@ -1099,6 +1116,33 @@ export interface components {
             current_password?: string | null;
             /** New Password */
             new_password?: string | null;
+        };
+        /** RankingOut */
+        RankingOut: {
+            team: components["schemas"]["TeamOut"];
+            /** Rank */
+            rank?: number | null;
+            /** Previous Rank */
+            previous_rank?: number | null;
+        };
+        /** RankingWeekOut */
+        RankingWeekOut: {
+            /** Id */
+            id: number;
+            /** Number */
+            number: number;
+        };
+        /** RankingsOut */
+        RankingsOut: {
+            week: components["schemas"]["WeekOut"];
+            /** Previous Week Number */
+            previous_week_number: number | null;
+            /** Weeks */
+            weeks: components["schemas"]["RankingWeekOut"][];
+            /** Entries */
+            entries: components["schemas"]["RankingOut"][];
+            /** Dropped */
+            dropped: components["schemas"]["RankingOut"][];
         };
         /** RegisterIn */
         RegisterIn: {
@@ -2138,6 +2182,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SeasonOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    season_rankings_api_seasons__season_id__rankings_get: {
+        parameters: {
+            query?: {
+                week_id?: number | null;
+            };
+            header?: never;
+            path: {
+                season_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RankingsOut"];
                 };
             };
             /** @description Validation Error */

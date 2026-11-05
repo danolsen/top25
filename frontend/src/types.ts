@@ -90,6 +90,16 @@ export type Score = {
 
 export type Results = { week: Week; entries: PollEntry[]; score: Score | null };
 
+export type Ranking = { team: Team; rank: number | null; previous_rank: number | null };
+
+export type Rankings = {
+  week: Week;
+  previous_week_number: number | null;
+  weeks: { id: number; number: number }[];
+  entries: Ranking[];
+  dropped: Ranking[];
+};
+
 export type Standing = {
   rank: number;
   user_id: number;
@@ -174,6 +184,7 @@ export type SchemaCheck = [
   Matches<Poll, Schemas["PollOut"]>,
   Matches<Score, Schemas["ScoreOut"]>,
   Matches<Results, Schemas["ResultsOut"]>,
+  Matches<Rankings, Schemas["RankingsOut"]>,
   Matches<Standing, Schemas["StandingOut"]>,
   Matches<HistoryRow, Schemas["HistoryOut"]>,
   Matches<Member, Schemas["MemberOut"]>,

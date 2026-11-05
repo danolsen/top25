@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import { TeamMark } from "../components/ui";
 import { shownRank, sportLabel } from "../format";
@@ -27,6 +27,7 @@ export function Results() {
       <div>
         <p className="muted">{sportLabel(data.week.sport)} · {data.week.season_name}</p>
         <h1 style={{ margin: 0 }}>Week {data.week.number} poll</h1>
+        <p><Link to={`/rankings?week=${data.week.id}`}>Rankings and week-to-week change</Link></p>
         {data.score && (
           <p>{data.score.total_points} points · {data.score.proximity_points} proximity · {data.score.bubble_points} bubble · {data.score.exact_count} exact</p>
         )}

@@ -24,6 +24,9 @@ from app.schemas import (
     EntryOut,
     HistoryOut,
     PollOut,
+    RankingOut,
+    RankingsOut,
+    RankingWeekOut,
     ScoreOut,
     SeasonOut,
     StandingOut,
@@ -287,6 +290,48 @@ def poll_view(db: Session, week: Week, source: str) -> PollOut:
         source=source,  # type: ignore[arg-type]
         entries=entries_out(db, entries),
         scores_stale=week.scores_stale,
+    )
+
+
+def rankings_for(db: Session, season_id: int, week_id: int | None) -> RankingsOut:
+    season = db.get(Season, season_id)
+    if season is None:
+        raise HTTPException(status_code=404, detail="Season not found.")
+    weeks = published_weeks(db, season_id)
+    if not weeks:
+        raise HTTPException(status_code=404, detail="No poll has been published for this season yet.")
+    chosen = weeks[-1] if week_id is None else next((week for week in weeks if week.id == week_id), None)
+    if chosen is None or chosen.poll is None:
+        raise HTTPException(status_code=404, detail="That week does not have a published poll.")
+    previous = previous_published_week(db, chosen)
+    previous_ranks = {
+        entry.team_id: entry.rank
+        for entry in (previous.poll.entries if previous and previous.poll else [])
+        if entry.placement == "ranked" and entry.rank is not None
+    }
+    current = [
+        entry
+        for entry in entries_out(db, list(chosen.poll.entries))
+        if entry.placement == "ranked" and entry.rank is not None
+    ]
+    ranked_ids = {entry.team.id for entry in current}
+    dropped_teams = load_team_map(db, set(previous_ranks) - ranked_ids)
+    dropped = sorted(
+        (
+            RankingOut(team=team_out(team), previous_rank=previous_ranks[team_id])
+            for team_id, team in dropped_teams.items()
+        ),
+        key=lambda row: (row.previous_rank or 0, row.team.name),
+    )
+    return RankingsOut(
+        week=week_out(chosen),
+        previous_week_number=previous.number if previous else None,
+        weeks=[RankingWeekOut(id=week.id, number=week.number) for week in weeks],
+        entries=[
+            RankingOut(team=entry.team, rank=entry.rank, previous_rank=previous_ranks.get(entry.team.id))
+            for entry in current
+        ],
+        dropped=dropped,
     )
 
 

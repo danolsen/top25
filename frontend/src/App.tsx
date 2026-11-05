@@ -7,6 +7,7 @@ import { Home } from "./pages/Home";
 import { Join, LeagueDetail, Leagues, SchoolLeagues } from "./pages/Leagues";
 import { Profile } from "./pages/Profile";
 import { Results } from "./pages/Results";
+import { Rankings } from "./pages/Rankings";
 import { History, Standings } from "./pages/Standings";
 import { Disclaimer, Landing, Login, Magic, Register, Reset, Rules, Setup } from "./pages/public";
 
@@ -47,6 +48,7 @@ export function App() {
         <Route path="/home" element={<RequireName><Home /></RequireName>} />
         <Route path="/weeks/:weekId" element={<RequireName><Ballot /></RequireName>} />
         <Route path="/weeks/:weekId/results" element={<RequireName><Results /></RequireName>} />
+        <Route path="/rankings" element={<RequireName><Rankings /></RequireName>} />
         <Route path="/standings" element={<RequireName><Standings /></RequireName>} />
         <Route path="/history" element={<RequireName><History /></RequireName>} />
         <Route path="/leagues" element={<RequireName><Leagues /></RequireName>} />

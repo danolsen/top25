@@ -45,6 +45,7 @@ export function Home() {
             ) : (
               <Link className="btn primary" to={`/weeks/${current.id}`}>Make picks</Link>
             )}
+            <Link className="btn" to="/rankings">Current Top 25</Link>
             <Link className="btn" to="/standings">Standings</Link>
           </div>
         </div>

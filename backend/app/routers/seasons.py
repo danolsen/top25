@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.deps import get_admin, get_ready_user, get_super_admin
 from app.models import Season, User, Week
-from app.schemas import SeasonIn, SeasonOut, SeasonUpdate, WeekIn, WeekOut, WeekUpdate
-from app.services.game import aware, refresh_week, season_out, utcnow, week_out
+from app.schemas import RankingsOut, SeasonIn, SeasonOut, SeasonUpdate, WeekIn, WeekOut, WeekUpdate
+from app.services.game import aware, rankings_for, refresh_week, season_out, utcnow, week_out
 
 router = APIRouter(prefix="/api", tags=["seasons"])
 
@@ -56,6 +56,11 @@ def update_season(
         season.status = body.status
     db.commit()
     return season_out(season)
+
+
+@router.get("/seasons/{season_id}/rankings", response_model=RankingsOut)
+def season_rankings(season_id: int, week_id: int | None = None, _: User = Depends(get_ready_user), db: Session = Depends(get_db)):
+    return rankings_for(db, season_id, week_id)
 
 
 @router.get("/seasons/{season_id}/weeks", response_model=list[WeekOut])

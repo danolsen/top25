@@ -45,6 +45,7 @@ function nextTheme(current: Theme): Theme {
 
 const links = [
   ["/home", "Home"],
+  ["/rankings", "Rankings"],
   ["/standings", "Standings"],
   ["/leagues", "Leagues"],
   ["/schools", "Schools"],

@@ -5,7 +5,7 @@ from app.config import get_settings
 from app.db import SessionLocal
 from app.emailer import outbox
 from app.main import app
-from app.models import School, Team, User, WeekScore, utcnow
+from app.models import OfficialEntry, OfficialPoll, School, Team, User, Week, WeekScore, utcnow
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from tests.conftest import call
@@ -278,3 +278,86 @@ def test_week_scoring_leagues_and_logos(client: TestClient):
     archive_view = call(player, "get", f"/api/standings/global?season_id={season_id}")
     assert archive_view.status_code == 200
     assert archive_view.json()[0]["points"] > 0
+
+
+def _publish(week_id: int, ranks: list[tuple[int, int]], also: tuple[int, int] | None = None) -> None:
+    db = SessionLocal()
+    week = db.get(Week, week_id)
+    assert week is not None
+    week.status = "published"
+    poll = OfficialPoll(week_id=week.id, published_at=datetime.now(UTC), published_by=None)
+    db.add(poll)
+    db.flush()
+    for position, (team_id, rank) in enumerate(ranks, start=1):
+        db.add(
+            OfficialEntry(
+                poll_id=poll.id,
+                team_id=team_id,
+                placement="ranked",
+                position=position,
+                rank=rank,
+                votes=0,
+                first_place_votes=0,
+            )
+        )
+    if also:
+        db.add(
+            OfficialEntry(
+                poll_id=poll.id,
+                team_id=also[0],
+                placement="also_receiving",
+                position=None,
+                rank=None,
+                votes=also[1],
+                first_place_votes=0,
+            )
+        )
+    db.commit()
+    db.close()
+
+
+def test_rankings_follow_the_latest_poll_and_the_previous_week(client: TestClient):
+    register(client, "rank@example.com")
+    confirm(client, "Rank Reader")
+    promote("rank@example.com")
+    team_ids = build_teams()
+    season = call(client, "post", "/api/seasons", json={"sport": "mens_basketball", "name": "Movement", "status": "active"})
+    assert season.status_code == 200, season.text
+    season_id = season.json()["id"]
+    future = (datetime.now(UTC) + timedelta(days=2)).isoformat()
+    first = call(client, "post", f"/api/seasons/{season_id}/weeks", json={"deadline_at": future})
+    second = call(client, "post", f"/api/seasons/{season_id}/weeks", json={"deadline_at": future})
+    third = call(client, "post", f"/api/seasons/{season_id}/weeks", json={"deadline_at": future})
+    assert first.status_code == 200 and second.status_code == 200 and third.status_code == 200
+    first_id = first.json()["id"]
+    second_id = second.json()["id"]
+    _publish(first_id, [(team_ids[0], 1), (team_ids[1], 2), (team_ids[2], 3)])
+    _publish(second_id, [(team_ids[1], 1), (team_ids[0], 1), (team_ids[3], 3)], also=(team_ids[4], 12))
+
+    latest = call(client, "get", f"/api/seasons/{season_id}/rankings")
+    assert latest.status_code == 200, latest.text
+    body = latest.json()
+    assert body["week"]["id"] == second_id
+    assert body["previous_week_number"] == 1
+    assert [week["number"] for week in body["weeks"]] == [1, 2]
+    by_team = {row["team"]["id"]: row for row in body["entries"]}
+    assert list(by_team) == [team_ids[1], team_ids[0], team_ids[3]]
+    assert by_team[team_ids[1]]["rank"] == 1
+    assert by_team[team_ids[1]]["previous_rank"] == 2
+    assert by_team[team_ids[0]]["rank"] == 1
+    assert by_team[team_ids[0]]["previous_rank"] == 1
+    assert by_team[team_ids[3]]["previous_rank"] is None
+    assert team_ids[4] not in by_team
+    assert [row["team"]["id"] for row in body["dropped"]] == [team_ids[2]]
+    assert body["dropped"][0]["previous_rank"] == 3
+
+    earlier = call(client, "get", f"/api/seasons/{season_id}/rankings?week_id={first_id}")
+    assert earlier.status_code == 200
+    assert earlier.json()["previous_week_number"] is None
+    assert all(row["previous_rank"] is None for row in earlier.json()["entries"])
+    assert earlier.json()["dropped"] == []
+
+    missing = call(client, "get", f"/api/seasons/{season_id}/rankings?week_id={third.json()['id']}")
+    assert missing.status_code == 404
+    quiet = call(client, "post", "/api/seasons", json={"sport": "mens_basketball", "name": "Empty", "status": "upcoming"})
+    assert call(client, "get", f"/api/seasons/{quiet.json()['id']}/rankings").status_code == 404
