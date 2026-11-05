@@ -105,7 +105,7 @@ export function Rankings() {
             {!data.entries.length && <p className="muted">This poll has no ranked teams.</p>}
           </div>
           {data.dropped.length > 0 && (
-            <div className="panel">
+            <div className="panel dropped-out">
               <h2>Dropped out</h2>
               <ul className="plain-list">
                 {data.dropped.map((entry) => (
