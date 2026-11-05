@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../api";
-import { useAuth } from "../auth";
+import { googleStartHref, useAuth } from "../auth";
 import type { User } from "../types";
 
 export function Profile() {
@@ -60,7 +60,7 @@ export function Profile() {
         {user.google_connected ? (
           <button className="btn" type="button" onClick={() => void disconnect()}>Disconnect Google</button>
         ) : (
-          <a className="btn" href="/api/auth/google/start?link=1">Connect Google</a>
+          <a className="btn" href={googleStartHref(true)}>Connect Google</a>
         )}
         {user.role !== "user" && <a href="/api/docs">API reference</a>}
       </div>

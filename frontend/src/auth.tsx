@@ -47,6 +47,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+export function googleStartHref(link = false): string {
+  const path = `/api/auth/google/start${link ? "?link=1" : ""}`;
+  if (window.location.hostname === "127.0.0.1") {
+    const url = new URL(path, window.location.origin);
+    url.hostname = "localhost";
+    return url.toString();
+  }
+  return path;
+}
+
 export function useAuth(): AuthValue {
   const value = useContext(AuthContext);
   if (!value) throw new Error("Auth is unavailable");

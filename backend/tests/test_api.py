@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 
+from app.config import get_settings
 from app.db import SessionLocal
 from app.emailer import outbox
 from app.main import app
@@ -14,6 +15,18 @@ PNG = (
     b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xf8\xff\xff?\x00\x05\xfe\x02\xfe"
     b"\xa7Y\x81\x84\x00\x00\x00\x00IEND\xaeB`\x82"
 )
+
+
+def test_google_start_stays_on_the_proxy_host(client, monkeypatch):
+    settings = get_settings()
+    monkeypatch.setattr(settings, "google_client_id", "client")
+    monkeypatch.setattr(settings, "google_client_secret", "secret")
+    monkeypatch.setattr(settings, "google_redirect_uri", "https://top25.pages.dev/api/auth/google/callback")
+    response = client.get("/api/auth/google/start", headers={"host": "top25.fly.dev"}, follow_redirects=False)
+    assert response.status_code == 307
+    location = response.headers["location"]
+    assert location.startswith("https://accounts.google.com/o/oauth2/v2/auth?")
+    assert "top25.pages.dev" not in location.split("?", 1)[0]
 
 
 def register(client: TestClient, email: str, name: str | None = None):

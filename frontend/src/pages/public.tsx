@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
-import { useAuth } from "../auth";
+import { googleStartHref, useAuth } from "../auth";
 import { DISCLAIMER } from "../format";
 import type { User } from "../types";
 
@@ -57,7 +57,7 @@ export function Login() {
       <label className="field">Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
       <label className="field">Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
       <button className="btn primary" type="submit">Log in</button>
-      <a className="btn" href="/api/auth/google/start">Continue with Google</a>
+      <a className="btn" href={googleStartHref()}>Continue with Google</a>
       <div className="row auth-links">
         <Link to="/register">Create an account</Link>
         <Link to="/reset">Forgot password</Link>
@@ -99,7 +99,7 @@ export function Register() {
       <label className="field">Display name, optional<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} maxLength={24} /></label>
       <p className="muted">{DISCLAIMER}</p>
       <button className="btn primary" type="submit">Create account</button>
-      <a className="btn" href="/api/auth/google/start">Continue with Google</a>
+      <a className="btn" href={googleStartHref()}>Continue with Google</a>
       <Link to="/login">Already have an account? Log in</Link>
     </form>
   );
