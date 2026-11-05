@@ -35,12 +35,14 @@ export function Modal({
   title,
   children,
   confirmLabel,
+  cancelLabel = "Keep editing",
   onConfirm,
   onClose,
 }: {
   title: string;
   children: React.ReactNode;
   confirmLabel: string;
+  cancelLabel?: string;
   onConfirm: () => void;
   onClose: () => void;
 }) {
@@ -51,7 +53,7 @@ export function Modal({
         <div>{children}</div>
         <div className="row">
           <button className="btn primary" type="button" onClick={onConfirm}>{confirmLabel}</button>
-          <button className="btn" type="button" onClick={onClose}>Keep editing</button>
+          <button className="btn" type="button" onClick={onClose}>{cancelLabel}</button>
         </div>
       </div>
     </div>

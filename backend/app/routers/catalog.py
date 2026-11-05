@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.config import get_settings
 from app.db import get_db
 from app.deps import get_optional_user, get_super_admin
-from app.models import School, Team, User
+from app.models import Ballot, BallotPick, League, OfficialEntry, OfficialPoll, School, Season, Team, User, Week
 from app.schemas import SchoolImportOut, SchoolIn, SchoolOut, SchoolUpdate, TeamOut
 from app.services.catalog import SCHOOL_IMPORT_TEMPLATE, SchoolImportError, load_schools_csv, school_out, team_out
 
@@ -23,6 +23,59 @@ IMAGE_TYPES = {
     "image/gif": "gif",
 }
 MEDIA_NAME = re.compile(r"^[a-f0-9]{32}\.(png|jpg|jpeg|webp|gif)$")
+
+
+def _sport_name(sport: str) -> str:
+    return "Football" if sport == "mens_football" else "Basketball"
+
+
+def _limited(lines: list[str], cap: int = 12) -> list[str]:
+    if len(lines) <= cap:
+        return lines
+    return [*lines[:cap], f"and {len(lines) - cap} more"]
+
+
+def _delete_block_reason(db: Session, team_ids: list[int]) -> str | None:
+    if not team_ids:
+        return None
+    polls = db.execute(
+        select(Season.sport, Season.name, Week.number)
+        .join(Week, Week.season_id == Season.id)
+        .join(OfficialPoll, OfficialPoll.week_id == Week.id)
+        .join(OfficialEntry, OfficialEntry.poll_id == OfficialPoll.id)
+        .where(OfficialEntry.team_id.in_(team_ids))
+        .distinct()
+        .order_by(Season.sport, Season.name, Week.number)
+    ).all()
+    picks = db.execute(
+        select(User.display_name, Season.sport, Season.name, Week.number)
+        .join(Ballot, Ballot.user_id == User.id)
+        .join(BallotPick, BallotPick.ballot_id == Ballot.id)
+        .join(Week, Week.id == Ballot.week_id)
+        .join(Season, Season.id == Week.season_id)
+        .where(BallotPick.team_id.in_(team_ids))
+        .distinct()
+        .order_by(User.display_name, Season.sport, Season.name, Week.number)
+    ).all()
+    leagues = db.execute(
+        select(League.name, Season.sport, Season.name)
+        .join(Season, Season.id == League.season_id)
+        .where(League.team_id.in_(team_ids))
+        .order_by(Season.sport, Season.name, League.name)
+    ).all()
+    sections: list[str] = []
+    if polls:
+        lines = [f"{_sport_name(sport)} {season}, week {number}" for sport, season, number in polls]
+        sections.append("Official poll:\n" + "\n".join(_limited(lines)))
+    if picks:
+        lines = [f"{player}, {_sport_name(sport)} {season}, week {number}" for player, sport, season, number in picks]
+        sections.append("Picks:\n" + "\n".join(_limited(lines)))
+    if leagues:
+        lines = [f"{name}, {_sport_name(sport)} {season}" for name, sport, season in leagues]
+        sections.append("School league:\n" + "\n".join(_limited(lines)))
+    if not sections:
+        return None
+    return "This school cannot be deleted.\n\n" + "\n\n".join(sections)
 
 
 def _apply_sports(db: Session, school: School, sports: list[str]) -> None:
@@ -139,6 +192,24 @@ def update_school(
         raise HTTPException(status_code=409, detail="A school with that name already exists.") from exc
     db.refresh(school)
     return school_out(school)
+
+
+@router.delete("/schools/{school_id}", status_code=204)
+def delete_school(school_id: int, _: User = Depends(get_super_admin), db: Session = Depends(get_db)):
+    school = db.get(School, school_id)
+    if school is None:
+        raise HTTPException(status_code=404, detail="School not found.")
+    reason = _delete_block_reason(db, [team.id for team in school.teams])
+    if reason:
+        raise HTTPException(status_code=409, detail=reason)
+    logo_key = school.logo_file_key
+    db.delete(school)
+    db.commit()
+    if logo_key:
+        logo = get_settings().storage_path() / logo_key
+        if logo.is_file():
+            logo.unlink()
+    return Response(status_code=204)
 
 
 @router.post("/schools/{school_id}/logo", response_model=SchoolOut)

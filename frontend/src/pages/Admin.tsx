@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../auth";
 import { SortableRanks } from "../components/SortableRanks";
-import { SeasonSelect, TeamMark, useSeasons } from "../components/ui";
+import { Modal, SeasonSelect, TeamMark, useSeasons } from "../components/ui";
 import { officialRanks, shownRank, sportLabel, when } from "../format";
 import { usePinnedSport, useSport, useSportLeaveGuard } from "../sport";
 import type { AdminUser, Audit, Poll, School, SchoolImport, Season, Team, Week } from "../types";
@@ -400,6 +400,16 @@ export function AdminTeams() {
     }
   }
 
+  async function removeSchool(school: School) {
+    setError("");
+    try {
+      await api(`/api/schools/${school.id}`, { method: "DELETE" });
+      setSchools((current) => current.filter((item) => item.id !== school.id));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not delete the school");
+    }
+  }
+
   async function upload(schoolId: number, file: File) {
     const body = new FormData();
     body.set("file", file);
@@ -415,7 +425,7 @@ export function AdminTeams() {
     <section className="stack">
       <h1>Teams</h1>
       <p>One school can play football, basketball, or both. The lists stay separate.</p>
-      {error && <p className="danger">{error}</p>}
+      {error && <p className="danger" style={{ whiteSpace: "pre-line" }}>{error}</p>}
       {notice && <p className="good">{notice}</p>}
       <div className="panel stack">
         <p>Load several schools from a CSV file. Download the template and replace the example row. A row matches a school by name or abbreviation and updates that school instead of adding a second one. Football and basketball follow the yes or no in the file. Leave the logo URL blank to keep the current logo.</p>
@@ -451,7 +461,7 @@ export function AdminTeams() {
         <button className="btn primary" type="submit">Add school</button>
       </form>
       {schools.map((school) => (
-        <SchoolEditor key={school.id} school={school} onSave={saveSchool} onUpload={upload} />
+        <SchoolEditor key={school.id} school={school} onSave={saveSchool} onUpload={upload} onDelete={removeSchool} />
       ))}
     </section>
   );
@@ -468,13 +478,16 @@ function SchoolEditor({
   school,
   onSave,
   onUpload,
+  onDelete,
 }: {
   school: School;
   onSave: (school: School, sports: string[]) => Promise<void>;
   onUpload: (schoolId: number, file: File) => Promise<void>;
+  onDelete: (school: School) => Promise<void>;
 }) {
   const [draft, setDraft] = useState(school);
   const [sports, setSports] = useState(() => sportsFor(school));
+  const [confirming, setConfirming] = useState(false);
   useEffect(() => {
     setDraft(school);
     setSports(sportsFor(school));
@@ -493,6 +506,12 @@ function SchoolEditor({
       <label><input type="checkbox" checked={sports.basketball} onChange={(event) => setSports({ ...sports, basketball: event.target.checked })} /> Basketball</label>
       <div className="row">
         <button className="btn" type="submit">Save</button>
+        <button className="btn danger" type="button" onClick={() => setConfirming(true)}>Delete</button>
+        {confirming && (
+          <Modal title={`Delete ${school.name}?`} confirmLabel="Delete school" cancelLabel="Cancel" onConfirm={() => { setConfirming(false); void onDelete(school); }} onClose={() => setConfirming(false)}>
+            <p>This removes {school.name} from football and basketball.</p>
+          </Modal>
+        )}
         <label className="btn">Upload logo
           <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void onUpload(school.id, file); }} />
         </label>

@@ -1,4 +1,4 @@
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -112,11 +112,25 @@ def reset_password(body: ResetIn, db: Session = Depends(get_db)):
     return _auth_response(db, user)
 
 
+def _google_start_on_callback_host(request: Request, redirect_uri: str) -> str | None:
+    expected = urlparse(redirect_uri)
+    host = request.headers.get("host", "")
+    if not expected.netloc or host == expected.netloc:
+        return None
+    target = f"{expected.scheme}://{expected.netloc}{request.url.path}"
+    if request.url.query:
+        target = f"{target}?{request.url.query}"
+    return target
+
+
 @router.get("/google/start")
 def google_start(request: Request):
     settings = get_settings()
     if not settings.google_client_id or not settings.google_client_secret:
         return RedirectResponse(f"{settings.frontend_url}/login?error=google")
+    aligned = _google_start_on_callback_host(request, settings.google_redirect_uri)
+    if aligned:
+        return RedirectResponse(aligned)
     state = new_token()
     params = urlencode(
         {

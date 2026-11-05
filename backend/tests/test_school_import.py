@@ -1,5 +1,7 @@
+from datetime import UTC, datetime, timedelta
+
 from app.db import SessionLocal
-from app.models import School, Team
+from app.models import Ballot, BallotPick, League, OfficialEntry, OfficialPoll, School, Season, Team, User, Week
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
@@ -140,6 +142,64 @@ def test_import_rejects_an_abbreviation_owned_by_another_school(client):
     listed = client.get("/api/schools").json()
     coastal = next(school for school in listed if school["name"] == "Coastal")
     assert coastal["abbreviation"] == "COAST"
+
+
+def school_body(name: str) -> dict:
+    return {
+        "name": name,
+        "abbreviation": "TMP",
+        "mascot": "Temps",
+        "primary_color": "#111111",
+        "secondary_color": "#EEEEEE",
+        "logo_url": None,
+        "sports": ["mens_football"],
+    }
+
+
+def test_delete_school_and_refuse_one_in_use(client):
+    super_admin(client)
+    created = call(client, "post", "/api/schools", json=school_body("Temporary State"))
+    assert created.status_code == 200, created.text
+    school_id = created.json()["id"]
+    removed = call(client, "delete", f"/api/schools/{school_id}")
+    assert removed.status_code == 204, removed.text
+    listed = call(client, "get", "/api/schools")
+    assert school_id not in {row["id"] for row in listed.json()}
+    assert call(client, "delete", f"/api/schools/{school_id}").status_code == 404
+
+    kept = call(client, "post", "/api/schools", json=school_body("Kept State"))
+    assert kept.status_code == 200, kept.text
+    team_id = kept.json()["teams"][0]["id"]
+    db = SessionLocal()
+    player = db.scalar(select(User).where(User.email == "boss@example.com"))
+    assert player is not None
+    player.display_name = "Boss Maple"
+    season = Season(sport="mens_football", name="Guard", status="active")
+    db.add(season)
+    db.flush()
+    week = Week(season_id=season.id, number=3, deadline_at=datetime.now(UTC) + timedelta(days=1), status="published")
+    db.add(week)
+    db.flush()
+    poll = OfficialPoll(week_id=week.id, published_at=datetime.now(UTC), published_by=player.id)
+    db.add(poll)
+    db.flush()
+    db.add(OfficialEntry(poll_id=poll.id, team_id=team_id, placement="ranked", position=1, rank=1, votes=0, first_place_votes=0))
+    ballot = Ballot(user_id=player.id, week_id=week.id, status="submitted")
+    db.add(ballot)
+    db.flush()
+    db.add(BallotPick(ballot_id=ballot.id, team_id=team_id, rank=4))
+    db.add(League(season_id=season.id, sport="mens_football", kind="school", name="Kept", team_id=team_id))
+    db.commit()
+    db.close()
+    blocked = call(client, "delete", f"/api/schools/{kept.json()['id']}")
+    assert blocked.status_code == 409
+    detail = blocked.json()["detail"]
+    assert "Official poll:" in detail
+    assert "Football Guard, week 3" in detail
+    assert "Picks:" in detail
+    assert "Boss Maple, Football Guard, week 3" in detail
+    assert "School league:" in detail
+    assert "Kept, Football Guard" in detail
 
 
 def test_import_is_super_admin_only(client):
